@@ -8,15 +8,18 @@ from sklearn.metrics.pairwise import cosine_similarity
 app = Flask(__name__)
 
 # ----------------------------
-# LOAD DATA SAFELY (Render-safe path)
+# LOAD DATA
 # ----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 csv_path = os.path.join(BASE_DIR, "spotify_songs.csv")
 
 df = pd.read_csv(csv_path)
 
+# 🔥 FIX 1: remove duplicate songs at source
+df = df.drop_duplicates(subset=["track_name", "track_artist"])
+
 # ----------------------------
-# FEATURE ENGINEERING
+# AUDIO FEATURES
 # ----------------------------
 audio_features = [
     'danceability','energy','key','loudness','mode',
@@ -24,7 +27,7 @@ audio_features = [
     'liveness','valence','tempo'
 ]
 
-# Handle missing values (prevents Render crashes)
+# Clean missing values
 df[audio_features] = df[audio_features].fillna(0)
 
 # Normalize features
@@ -42,6 +45,23 @@ X = df[audio_features]
 def home():
     return render_template("index.html")
 
+# ----------------------------
+# AUTOCOMPLETE
+# ----------------------------
+@app.route("/api/suggest")
+def suggest():
+    q = request.args.get("q", "").strip().lower()
+
+    if not q:
+        return jsonify([])
+
+    matches = df[
+        df["track_name"].str.lower().str.contains(q, na=False)
+    ]
+
+    return jsonify(
+        matches["track_name"].head(10).tolist()
+    )
 
 # ----------------------------
 # RECOMMENDATION ENGINE
@@ -49,43 +69,11 @@ def home():
 @app.route("/api/recommend", methods=["POST"])
 def recommend():
     data = request.json
-    track = data.get("track", "")
-
-    # fuzzy match instead of exact match
-    match = df[df["track_name"].str.lower() == track.lower()]
-    if match.empty:
-    match = df[df["track_name"].str.lower().str.contains(track.lower(), na=False)]
-
-    idx = match.index[0]
-
-    # cosine similarity
-    scores = cosine_similarity(X.iloc[idx:idx+1], X)[0]
-
-    # top 5 excluding itself
-    top_idx = scores.argsort()[::-1][1:6]
-
-    results_df = df.iloc[top_idx][['track_name', 'track_artist']].drop_duplicates()
-
-    results = results_df.to_dict(orient='records')
-    
-    return jsonify({
-        "found": True,
-        "results": results
-    })
-
-
-# ----------------------------
-# AUTOCOMPLETE
-# ----------------------------
-@app.route("/api/recommend", methods=["POST"])
-def recommend():
-    data = request.json
     track = data.get("track", "").strip().lower()
 
-    # 1. exact match first
+    # 🔥 FIX 2: better matching (exact first, fallback second)
     match = df[df["track_name"].str.lower() == track]
 
-    # 2. fallback fuzzy match
     if match.empty:
         match = df[df["track_name"].str.lower().str.contains(track, na=False)]
 
@@ -94,13 +82,16 @@ def recommend():
 
     idx = match.index[0]
 
+    # cosine similarity
     scores = cosine_similarity(X.iloc[idx:idx+1], X)[0]
-    top_idx = scores.argsort()[::-1][1:15]  # get more candidates first
+
+    # take more candidates first
+    top_idx = scores.argsort()[::-1][1:20]
 
     results_df = df.iloc[top_idx][['track_name', 'track_artist']]
 
-    # remove duplicates properly
-    results_df = results_df.drop_duplicates(subset=['track_name', 'track_artist']).head(5)
+    # 🔥 FIX 3: remove duplicates properly
+    results_df = results_df.drop_duplicates(subset=["track_name", "track_artist"]).head(5)
 
     results = results_df.to_dict(orient='records')
 
@@ -110,7 +101,7 @@ def recommend():
     })
 
 # ----------------------------
-# RENDER ENTRY POINT FIX
+# RUN SERVER (Render-safe)
 # ----------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
