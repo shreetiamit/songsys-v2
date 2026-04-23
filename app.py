@@ -65,8 +65,10 @@ def recommend():
     # top 5 excluding itself
     top_idx = scores.argsort()[::-1][1:6]
 
-    results = df.iloc[top_idx][['track_name', 'track_artist']].to_dict(orient='records')
+    results_df = df.iloc[top_idx][['track_name', 'track_artist']].drop_duplicates()
 
+    results = results_df.to_dict(orient='records')
+    
     return jsonify({
         "found": True,
         "results": results
