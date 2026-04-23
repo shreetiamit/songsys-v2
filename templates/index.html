@@ -1,26 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Songsys</title>
-
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <title>Songsys V2</title>
 
   <style>
     body {
       margin: 0;
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       background: #121212;
       color: white;
     }
 
     .container {
-      padding: 30px;
       max-width: 900px;
       margin: auto;
+      padding: 30px;
     }
 
     h1 {
       color: #1DB954;
+      margin-bottom: 20px;
     }
 
     input {
@@ -28,23 +27,25 @@
       padding: 12px;
       border-radius: 8px;
       border: none;
-      margin-top: 10px;
+      outline: none;
+      margin-bottom: 10px;
     }
 
     button {
-      margin-top: 10px;
-      padding: 10px;
-      background: #1DB954;
+      padding: 10px 16px;
       border: none;
       border-radius: 8px;
+      background: #1DB954;
       color: white;
       cursor: pointer;
+      margin-bottom: 20px;
     }
 
     #suggestions div {
-      padding: 8px;
+      padding: 10px;
       background: #1e1e1e;
       cursor: pointer;
+      border-bottom: 1px solid #333;
     }
 
     #suggestions div:hover {
@@ -54,27 +55,33 @@
     .card {
       background: #1e1e1e;
       padding: 15px;
-      margin-top: 10px;
+      margin-bottom: 10px;
       border-radius: 10px;
+      transition: 0.2s;
     }
 
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+    .card:hover {
+      transform: scale(1.02);
     }
 
-    .chart {
-      margin-top: 10px;
+    .artist {
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .score {
+      color: #1DB954;
+      font-size: 12px;
+      margin-top: 5px;
     }
   </style>
 </head>
 
 <body>
   <div class="container">
-    <h1>Songsys</h1>
+    <h1>🎵 Songsys</h1>
 
-    <input id="track" oninput="suggest()" placeholder="Search a song">
+    <input id="track" placeholder="Search a song..." oninput="suggest()">
     <div id="suggestions"></div>
 
     <button onclick="recommend()">Get Recommendations</button>
@@ -86,11 +93,16 @@
 async function suggest() {
   const q = document.getElementById("track").value;
 
+  if (!q) {
+    document.getElementById("suggestions").innerHTML = "";
+    return;
+  }
+
   const res = await fetch(`/api/suggest?q=${q}`);
   const data = await res.json();
 
   document.getElementById("suggestions").innerHTML =
-    data.map(x => `<div onclick="selectSong('${x}')">${x}</div>`).join("");
+    data.map(item => `<div onclick="selectSong('${item}')">${item}</div>`).join("");
 }
 
 function selectSong(val) {
@@ -109,16 +121,17 @@ async function recommend() {
 
   const data = await res.json();
 
+  const resultsDiv = document.getElementById("results");
+
   if (!data.found) {
-    document.getElementById("results").innerHTML = "No results";
+    resultsDiv.innerHTML = "<p>No results found</p>";
     return;
   }
 
-  document.getElementById("results").innerHTML =
-  data.results.map(song => `
+  resultsDiv.innerHTML = data.results.map(song => `
     <div class="card">
-      <b>${song.track_name}</b><br>
-      ${song.track_artist}
+      <div><b>${song.track_name}</b></div>
+      <div class="artist">${song.track_artist}</div>
     </div>
   `).join("");
 }
