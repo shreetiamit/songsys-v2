@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Songsys V2</title>
+</head>
+<body>
+  <h1>🎵 Songsys V2 Running</h1>
+
+  <input id="track" placeholder="Enter song name">
+  <button onclick="testAPI()">Test</button>
+
+  <pre id="out"></pre>
+
+  <script>
+    async function testAPI() {
+      const track = document.getElementById("track").value;
+
+      const res = await fetch("/api/recommend", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({track})
+      });
+
+      const data = await res.json();
+      document.getElementById("out").innerText =
+        JSON.stringify(data, null, 2);
+    }
+  </script>
+</body>
+</html>
