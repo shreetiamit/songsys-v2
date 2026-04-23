@@ -15,7 +15,7 @@ csv_path = os.path.join(BASE_DIR, "spotify_songs.csv")
 
 df = pd.read_csv(csv_path)
 
-# remove duplicates early (IMPORTANT)
+# remove duplicates early
 df = df.drop_duplicates(subset=["track_name", "track_artist"])
 
 # ----------------------------
@@ -42,7 +42,7 @@ def home():
     return render_template("index.html")
 
 # ----------------------------
-# AUTOCOMPLETE (clean)
+# AUTOCOMPLETE
 # ----------------------------
 @app.route("/api/suggest")
 def suggest():
@@ -68,7 +68,7 @@ def recommend():
     track = data.get("track", "").strip().lower()
 
     # ----------------------------
-    # BETTER MATCHING
+    # STEP 1: FIND SEED SONG
     # ----------------------------
     match = df[df["track_name"].str.lower() == track]
 
@@ -78,33 +78,34 @@ def recommend():
     if match.empty:
         return jsonify({"found": False})
 
-    # choose most popular match if multiple exist
+    # pick most popular match if multiple exist
     match = match.sort_values("track_popularity", ascending=False)
-
     idx = match.index[0]
 
     # ----------------------------
-    # COSINE SIMILARITY
+    # STEP 2: COSINE SIMILARITY
     # ----------------------------
     scores = cosine_similarity(X.iloc[idx:idx+1], X)[0]
 
     # ----------------------------
-    # DIVERSITY FIX (reduce same artist bias)
+    # STEP 3: DIVERSITY CONTROL
     # ----------------------------
     seed_artist = df.iloc[idx]["track_artist"]
 
     for i in range(len(scores)):
         if df.iloc[i]["track_artist"] == seed_artist:
-            scores[i] *= 0.7  # penalize same artist
+            scores[i] *= 0.65  # reduce same artist dominance
 
     # ----------------------------
-    # TOP RESULTS
+    # STEP 4: GET CANDIDATES
     # ----------------------------
-    top_idx = scores.argsort()[::-1][1:30]
+    top_idx = scores.argsort()[::-1][1:40]
 
     results_df = df.iloc[top_idx][['track_name', 'track_artist']]
 
-    # remove duplicates
+    # ----------------------------
+    # STEP 5: CLEAN RESULTS
+    # ----------------------------
     results_df = results_df.drop_duplicates(subset=["track_name"])
     results_df = results_df.drop_duplicates(subset=["track_artist"], keep="first")
 
