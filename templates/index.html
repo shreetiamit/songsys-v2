@@ -1,30 +1,128 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Songsys V2</title>
-</head>
-<body>
-  <h1>🎵 Songsys V2 Running</h1>
+  <title>Songsys</title>
 
-  <input id="track" placeholder="Enter song name">
-  <button onclick="testAPI()">Test</button>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
 
-  <pre id="out"></pre>
-
-  <script>
-    async function testAPI() {
-      const track = document.getElementById("track").value;
-
-      const res = await fetch("/api/recommend", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({track})
-      });
-
-      const data = await res.json();
-      document.getElementById("out").innerText =
-        JSON.stringify(data, null, 2);
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #121212;
+      color: white;
     }
-  </script>
+
+    .container {
+      padding: 30px;
+      max-width: 900px;
+      margin: auto;
+    }
+
+    h1 {
+      color: #1DB954;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      margin-top: 10px;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px;
+      background: #1DB954;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+    }
+
+    #suggestions div {
+      padding: 8px;
+      background: #1e1e1e;
+      cursor: pointer;
+    }
+
+    #suggestions div:hover {
+      background: #333;
+    }
+
+    .card {
+      background: #1e1e1e;
+      padding: 15px;
+      margin-top: 10px;
+      border-radius: 10px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .chart {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>🎵 Songsys</h1>
+
+    <input id="track" oninput="suggest()" placeholder="Search a song">
+    <div id="suggestions"></div>
+
+    <button onclick="recommend()">Get Recommendations</button>
+
+    <div id="results"></div>
+  </div>
+
+<script>
+async function suggest() {
+  const q = document.getElementById("track").value;
+
+  const res = await fetch(`/api/suggest?q=${q}`);
+  const data = await res.json();
+
+  document.getElementById("suggestions").innerHTML =
+    data.map(x => `<div onclick="selectSong('${x}')">${x}</div>`).join("");
+}
+
+function selectSong(val) {
+  document.getElementById("track").value = val;
+  document.getElementById("suggestions").innerHTML = "";
+}
+
+async function recommend() {
+  const track = document.getElementById("track").value;
+
+  const res = await fetch("/api/recommend", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({track})
+  });
+
+  const data = await res.json();
+
+  if (!data.found) {
+    document.getElementById("results").innerHTML = "No results";
+    return;
+  }
+
+  document.getElementById("results").innerHTML =
+    data.results.map(song => `
+      <div class="card">
+        <b>${song.track_name}</b><br>
+        ${song.track_artist}
+      </div>
+    `).join("");
+}
+</script>
+
 </body>
 </html>
