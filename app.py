@@ -52,10 +52,9 @@ def recommend():
     track = data.get("track", "")
 
     # fuzzy match instead of exact match
-    match = df[df["track_name"].str.lower().str.contains(track.lower(), na=False)]
-
+    match = df[df["track_name"].str.lower() == track.lower()]
     if match.empty:
-        return jsonify({"found": False})
+    match = df[df["track_name"].str.lower().str.contains(track.lower(), na=False)]
 
     idx = match.index[0]
 
@@ -78,21 +77,37 @@ def recommend():
 # ----------------------------
 # AUTOCOMPLETE
 # ----------------------------
-@app.route("/api/suggest")
-def suggest():
-    q = request.args.get("q", "")
+@app.route("/api/recommend", methods=["POST"])
+def recommend():
+    data = request.json
+    track = data.get("track", "").strip().lower()
 
-    if not q:
-        return jsonify([])
+    # 1. exact match first
+    match = df[df["track_name"].str.lower() == track]
 
-    matches = df[
-        df["track_name"].str.lower().str.contains(q.lower(), na=False)
-    ]
+    # 2. fallback fuzzy match
+    if match.empty:
+        match = df[df["track_name"].str.lower().str.contains(track, na=False)]
 
-    return jsonify(
-        matches["track_name"].head(10).tolist()
-    )
+    if match.empty:
+        return jsonify({"found": False})
 
+    idx = match.index[0]
+
+    scores = cosine_similarity(X.iloc[idx:idx+1], X)[0]
+    top_idx = scores.argsort()[::-1][1:15]  # get more candidates first
+
+    results_df = df.iloc[top_idx][['track_name', 'track_artist']]
+
+    # remove duplicates properly
+    results_df = results_df.drop_duplicates(subset=['track_name', 'track_artist']).head(5)
+
+    results = results_df.to_dict(orient='records')
+
+    return jsonify({
+        "found": True,
+        "results": results
+    })
 
 # ----------------------------
 # RENDER ENTRY POINT FIX
