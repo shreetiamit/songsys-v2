@@ -115,12 +115,12 @@ async function recommend() {
   }
 
   document.getElementById("results").innerHTML =
-    data.results.map(song => `
-      <div class="card">
-        <b>${song.track_name}</b><br>
-        ${song.track_artist}
-      </div>
-    `).join("");
+  data.results.map(song => `
+    <div class="card">
+      <b>${song.track_name}</b><br>
+      ${song.track_artist}
+    </div>
+  `).join("");
 }
 </script>
 
