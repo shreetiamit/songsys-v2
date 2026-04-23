@@ -51,13 +51,9 @@ def suggest():
     if not q:
         return jsonify([])
 
-    matches = df[
-        df["track_name"].str.lower().str.contains(q, na=False)
-    ]
+    matches = df[df["track_name"].str.lower().str.contains(q, na=False)]
 
-    return jsonify(
-        matches["track_name"].head(10).tolist()
-    )
+    return jsonify(matches["track_name"].head(10).tolist())
 
 # ----------------------------
 # RECOMMENDATION ENGINE
@@ -66,6 +62,37 @@ def suggest():
 def recommend():
     data = request.json
     track = data.get("track", "").strip().lower()
+
+    # better match
+    match = df[df["track_name"].str.lower().str.contains(track, na=False)]
+
+    if match.empty:
+        return jsonify({"found": False})
+
+    match = match.sort_values("track_popularity", ascending=False)
+    idx = match.index[0]
+
+    scores = cosine_similarity(X.iloc[idx:idx+1], X)[0]
+
+    seed_artist = df.iloc[idx]["track_artist"]
+
+    for i in range(len(scores)):
+        if df.iloc[i]["track_artist"] == seed_artist:
+            scores[i] *= 0.65
+
+    top_idx = scores.argsort()[::-1][1:40]
+
+    results_df = df.iloc[top_idx][['track_name', 'track_artist']]
+
+    results_df = results_df.drop_duplicates(subset=["track_name"])
+    results_df = results_df.drop_duplicates(subset=["track_artist"], keep="first")
+
+    results = results_df.head(5).to_dict(orient="records")
+
+    return jsonify({
+        "found": True,
+        "results": results
+    })
 
     # ----------------------------
     # STEP 1: FIND SEED SONG
