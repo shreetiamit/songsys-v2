@@ -15,7 +15,7 @@ csv_path = os.path.join(BASE_DIR, "spotify_songs.csv")
 
 df = pd.read_csv(csv_path)
 
-# remove duplicates early
+# 🔥 clean duplicates early (VERY IMPORTANT)
 df = df.drop_duplicates(subset=["track_name", "track_artist"])
 
 # ----------------------------
@@ -42,7 +42,7 @@ def home():
     return render_template("index.html")
 
 # ----------------------------
-# AUTOCOMPLETE
+# AUTOCOMPLETE (CLEAN + FAST)
 # ----------------------------
 @app.route("/api/suggest")
 def suggest():
@@ -63,39 +63,8 @@ def recommend():
     data = request.json
     track = data.get("track", "").strip().lower()
 
-    # better match
-    match = df[df["track_name"].str.lower().str.contains(track, na=False)]
-
-    if match.empty:
-        return jsonify({"found": False})
-
-    match = match.sort_values("track_popularity", ascending=False)
-    idx = match.index[0]
-
-    scores = cosine_similarity(X.iloc[idx:idx+1], X)[0]
-
-    seed_artist = df.iloc[idx]["track_artist"]
-
-    for i in range(len(scores)):
-        if df.iloc[i]["track_artist"] == seed_artist:
-            scores[i] *= 0.65
-
-    top_idx = scores.argsort()[::-1][1:40]
-
-    results_df = df.iloc[top_idx][['track_name', 'track_artist']]
-
-    results_df = results_df.drop_duplicates(subset=["track_name"])
-    results_df = results_df.drop_duplicates(subset=["track_artist"], keep="first")
-
-    results = results_df.head(5).to_dict(orient="records")
-
-    return jsonify({
-        "found": True,
-        "results": results
-    })
-
     # ----------------------------
-    # STEP 1: FIND SEED SONG
+    # STEP 1: FIND SEED SONG (BETTER MATCHING)
     # ----------------------------
     match = df[df["track_name"].str.lower() == track]
 
@@ -115,29 +84,30 @@ def recommend():
     scores = cosine_similarity(X.iloc[idx:idx+1], X)[0]
 
     # ----------------------------
-    # STEP 3: DIVERSITY CONTROL
+    # STEP 3: DIVERSITY CONTROL (IMPORTANT)
     # ----------------------------
     seed_artist = df.iloc[idx]["track_artist"]
 
     for i in range(len(scores)):
         if df.iloc[i]["track_artist"] == seed_artist:
-            scores[i] *= 0.65  # reduce same artist dominance
+            scores[i] *= 0.65  # reduce same artist repetition
 
     # ----------------------------
-    # STEP 4: GET CANDIDATES
+    # STEP 4: GET TOP CANDIDATES
     # ----------------------------
-    top_idx = scores.argsort()[::-1][1:40]
+    top_idx = scores.argsort()[::-1][1:50]
 
     results_df = df.iloc[top_idx][['track_name', 'track_artist']]
 
-    # ----------------------------
-    # STEP 5: CLEAN RESULTS
-    # ----------------------------
+    # remove duplicates
     results_df = results_df.drop_duplicates(subset=["track_name"])
     results_df = results_df.drop_duplicates(subset=["track_artist"], keep="first")
 
     results = results_df.head(5).to_dict(orient="records")
 
+    # ----------------------------
+    # RESPONSE
+    # ----------------------------
     return jsonify({
         "found": True,
         "results": results
